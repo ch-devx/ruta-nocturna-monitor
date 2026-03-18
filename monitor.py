@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 
 # ── Config ────────────────────────────────────────────────────────────────────
-KEYWORD     = "ruta nocturna"
+KEYWORD     = "world baseball classic"
 NTFY_TOPIC  = os.environ.get("NTFY_TOPIC", "")
 RSS_FEED    = os.environ.get("RSS_FEED_URL", "")
 SEEN_FILE   = "seen_posts.json"
