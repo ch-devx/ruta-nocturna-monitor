@@ -1,0 +1,43 @@
+name: Ruta Nocturna Monitor
+
+on:
+  schedule:
+    # Cada 2 horas en UTC → 0am, 2am, 4am... UTC = -4h Venezuela
+    # = 8pm, 10pm, 12am, 2am, 4am, 6am, 8am, 10am, 12pm, 2pm, 4pm, 6pm VET
+    - cron: "0 */2 * * *"
+
+  # Permite correrlo manualmente desde la pestaña Actions si quieres probar
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    # Permiso para leer y escribir en el repo (para actualizar seen_posts.json)
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run monitor
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python monitor.py
+
+      - name: Guardar seen_posts.json actualizado
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add seen_posts.json
+          git diff --staged --quiet || git commit -m "chore: update seen posts [skip ci]"
+          git push
