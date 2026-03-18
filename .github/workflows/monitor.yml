@@ -31,8 +31,11 @@ jobs:
 
       - name: Run monitor
         env:
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: python monitor.py
+          NTFY_TOPIC:   ${{ secrets.NTFY_TOPIC }}
+          RSS_FEED_URL: ${{ secrets.RSS_FEED_URL }}
+        run: |
+          echo "RSS definido: ${{ secrets.RSS_FEED_URL != '' }}"
+          python monitor.py
 
       - name: Guardar seen_posts.json actualizado
         run: |
