@@ -1,25 +1,15 @@
 import os
 import json
 import requests
+import xml.etree.ElementTree as ET
 from datetime import datetime
 
 # ── Config ────────────────────────────────────────────────────────────────────
-IG_PROFILE  = "cclasamericas"
 KEYWORD     = "ruta nocturna"
 NTFY_TOPIC  = os.environ.get("NTFY_TOPIC", "")
+RSS_FEED    = os.environ.get("RSS_FEED_URL", "")
 SEEN_FILE   = "seen_posts.json"
 # ─────────────────────────────────────────────────────────────────────────────
-
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/122.0.0.0 Safari/537.36"
-    ),
-    "Accept-Language": "es-VE,es;q=0.9,en;q=0.8",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "X-IG-App-ID": "936619743392459",
-}
 
 
 def load_seen() -> set:
@@ -34,7 +24,7 @@ def save_seen(seen: set):
         json.dump(list(seen), f)
 
 
-def send_notification(post_url: str, caption_preview: str):
+def send_notification(post_url: str, description: str):
     if not NTFY_TOPIC:
         print("[WARN] NTFY_TOPIC no configurado.")
         return
@@ -42,7 +32,7 @@ def send_notification(post_url: str, caption_preview: str):
     payload = {
         "topic":   NTFY_TOPIC,
         "title":   "🏃 ¡Ruta Nocturna detectada!",
-        "message": f"CC Las Américas publicó sobre la ruta nocturna.\n\n{caption_preview[:200]}",
+        "message": f"CC Las Américas publicó sobre la ruta nocturna.\n\n{description[:200]}",
         "actions": [{"action": "view", "label": "Ver publicación", "url": post_url}],
         "priority": 4,
     }
@@ -55,35 +45,48 @@ def send_notification(post_url: str, caption_preview: str):
         print(f"[ERROR] Notificación fallida: {e}")
 
 
-def fetch_posts() -> list[dict]:
-    url = f"https://www.instagram.com/api/v1/users/web_profile_info/?username={IG_PROFILE}"
-    r = requests.get(url, headers=HEADERS, timeout=15)
+def fetch_feed() -> list[dict]:
+    if not RSS_FEED:
+        raise ValueError("RSS_FEED_URL no configurado como secret.")
+
+    r = requests.get(RSS_FEED, timeout=15)
     r.raise_for_status()
-    data = r.json()
 
-    user = data["data"]["user"]
-    print(f"[INFO] Perfil cargado: @{IG_PROFILE} (id: {user['id']})")
+    root = ET.fromstring(r.content)
+    ns   = {}
 
-    posts_raw = user.get("edge_owner_to_timeline_media", {}).get("edges", [])
-    posts = []
-    for edge in posts_raw:
-        node = edge["node"]
-        shortcode = node.get("shortcode", "")
-        caption_edges = node.get("edge_media_to_caption", {}).get("edges", [])
-        caption = caption_edges[0]["node"]["text"] if caption_edges else ""
-        posts.append({"shortcode": shortcode, "caption": caption})
+    # Soporta tanto RSS 2.0 como Atom
+    if root.tag == "rss":
+        items = root.findall("./channel/item")
+        posts = []
+        for item in items:
+            link  = (item.findtext("link")        or "").strip()
+            title = (item.findtext("title")       or "").strip()
+            desc  = (item.findtext("description") or "").strip()
+            posts.append({"id": link, "url": link, "text": f"{title} {desc}"})
+    else:
+        # Atom feed
+        ns = {"atom": "http://www.w3.org/2005/Atom"}
+        entries = root.findall("atom:entry", ns)
+        posts = []
+        for entry in entries:
+            link_el = entry.find("atom:link", ns)
+            link    = link_el.attrib.get("href", "") if link_el is not None else ""
+            title   = (entry.findtext("atom:title",   "", ns) or "").strip()
+            summary = (entry.findtext("atom:summary", "", ns) or "").strip()
+            posts.append({"id": link, "url": link, "text": f"{title} {summary}"})
 
-    print(f"[INFO] {len(posts)} posts obtenidos.")
+    print(f"[INFO] {len(posts)} posts en el feed.")
     return posts
 
 
-def check_profile():
-    print(f"[{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}] Revisando @{IG_PROFILE}...")
+def check_feed():
+    print(f"[{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}] Revisando feed RSS...")
 
     try:
-        posts = fetch_posts()
+        posts = fetch_feed()
     except Exception as e:
-        print(f"[ERROR] No se pudo obtener posts: {e}")
+        print(f"[ERROR] No se pudo obtener el feed: {e}")
         raise SystemExit(1)
 
     seen     = load_seen()
@@ -91,18 +94,17 @@ def check_profile():
     found    = False
 
     for post in posts:
-        shortcode = post["shortcode"]
-        caption   = post["caption"].lower()
-        post_url  = f"https://www.instagram.com/p/{shortcode}/"
-        new_seen.add(shortcode)
+        post_id = post["id"]
+        text    = post["text"].lower()
+        new_seen.add(post_id)
 
-        if KEYWORD in caption:
-            if shortcode not in seen:
-                print(f"[MATCH] Post nuevo con '{KEYWORD}': {post_url}")
-                send_notification(post_url, post["caption"])
+        if KEYWORD in text:
+            if post_id not in seen:
+                print(f"[MATCH] '{KEYWORD}' encontrado: {post['url']}")
+                send_notification(post["url"], post["text"])
                 found = True
             else:
-                print(f"[SKIP]  Ya notificado: {shortcode}")
+                print(f"[SKIP]  Ya notificado: {post_id}")
 
     if not found:
         print(f"[OK] Sin novedades sobre '{KEYWORD}'.")
@@ -111,4 +113,4 @@ def check_profile():
 
 
 if __name__ == "__main__":
-    check_profile()
+    check_feed()

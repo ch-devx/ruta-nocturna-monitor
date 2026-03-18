@@ -1,0 +1,38 @@
+name: Ruta Nocturna Monitor
+
+on:
+  schedule:
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run monitor
+        env:
+          NTFY_TOPIC:   ${{ secrets.NTFY_TOPIC }}
+          RSS_FEED_URL: ${{ secrets.RSS_FEED_URL }}
+        run: python monitor.py
+
+      - name: Guardar seen_posts.json actualizado
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add seen_posts.json
+          git diff --staged --quiet || git commit -m "chore: update seen posts [skip ci]"
+          git push
