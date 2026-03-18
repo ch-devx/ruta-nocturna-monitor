@@ -1,16 +1,25 @@
-import instaloader
 import os
 import json
 import requests
 from datetime import datetime
 
 # ── Config ────────────────────────────────────────────────────────────────────
-IG_PROFILE       = "cclasamericas"
-KEYWORD          = "ruta nocturna"
-NTFY_TOPIC       = os.environ.get("NTFY_TOPIC", "")        # Set as GitHub secret
-SEEN_FILE        = "seen_posts.json"
-POSTS_TO_CHECK   = 12   # últimos N posts a revisar
+IG_PROFILE  = "cclasamericas"
+KEYWORD     = "ruta nocturna"
+NTFY_TOPIC  = os.environ.get("NTFY_TOPIC", "")
+SEEN_FILE   = "seen_posts.json"
 # ─────────────────────────────────────────────────────────────────────────────
+
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/122.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "es-VE,es;q=0.9,en;q=0.8",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "X-IG-App-ID": "936619743392459",
+}
 
 
 def load_seen() -> set:
@@ -27,21 +36,15 @@ def save_seen(seen: set):
 
 def send_notification(post_url: str, caption_preview: str):
     if not NTFY_TOPIC:
-        print("[WARN] NTFY_TOPIC no configurado, no se enviará notificación.")
+        print("[WARN] NTFY_TOPIC no configurado.")
         return
 
     payload = {
-        "topic":    NTFY_TOPIC,
-        "title":    "🏃 ¡Ruta Nocturna detectada!",
-        "message":  f"CC Las Américas publicó algo sobre la ruta nocturna.\n\n{caption_preview[:200]}",
-        "actions": [
-            {
-                "action": "view",
-                "label":  "Ver publicación",
-                "url":    post_url
-            }
-        ],
-        "priority": 4
+        "topic":   NTFY_TOPIC,
+        "title":   "🏃 ¡Ruta Nocturna detectada!",
+        "message": f"CC Las Américas publicó sobre la ruta nocturna.\n\n{caption_preview[:200]}",
+        "actions": [{"action": "view", "label": "Ver publicación", "url": post_url}],
+        "priority": 4,
     }
 
     try:
@@ -49,54 +52,60 @@ def send_notification(post_url: str, caption_preview: str):
         r.raise_for_status()
         print(f"[OK] Notificación enviada → {NTFY_TOPIC}")
     except Exception as e:
-        print(f"[ERROR] No se pudo enviar notificación: {e}")
+        print(f"[ERROR] Notificación fallida: {e}")
+
+
+def fetch_posts() -> list[dict]:
+    url = f"https://www.instagram.com/api/v1/users/web_profile_info/?username={IG_PROFILE}"
+    r = requests.get(url, headers=HEADERS, timeout=15)
+    r.raise_for_status()
+    data = r.json()
+
+    user = data["data"]["user"]
+    print(f"[INFO] Perfil cargado: @{IG_PROFILE} (id: {user['id']})")
+
+    posts_raw = user.get("edge_owner_to_timeline_media", {}).get("edges", [])
+    posts = []
+    for edge in posts_raw:
+        node = edge["node"]
+        shortcode = node.get("shortcode", "")
+        caption_edges = node.get("edge_media_to_caption", {}).get("edges", [])
+        caption = caption_edges[0]["node"]["text"] if caption_edges else ""
+        posts.append({"shortcode": shortcode, "caption": caption})
+
+    print(f"[INFO] {len(posts)} posts obtenidos.")
+    return posts
 
 
 def check_profile():
     print(f"[{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}] Revisando @{IG_PROFILE}...")
 
-    L = instaloader.Instaloader(
-        download_pictures=False,
-        download_videos=False,
-        download_video_thumbnails=False,
-        download_geotags=False,
-        download_comments=False,
-        save_metadata=False,
-        quiet=True
-    )
-
     try:
-        profile = instaloader.Profile.from_username(L.context, IG_PROFILE)
+        posts = fetch_posts()
     except Exception as e:
-        print(f"[ERROR] No se pudo cargar el perfil: {e}")
-        return
+        print(f"[ERROR] No se pudo obtener posts: {e}")
+        raise SystemExit(1)
 
-    seen = load_seen()
+    seen     = load_seen()
     new_seen = set(seen)
-    found_any = False
+    found    = False
 
-    posts_checked = 0
-    for post in profile.get_posts():
-        if posts_checked >= POSTS_TO_CHECK:
-            break
-        posts_checked += 1
-
-        post_id  = str(post.shortcode)
-        caption  = (post.caption or "").lower()
-        post_url = f"https://www.instagram.com/p/{post.shortcode}/"
+    for post in posts:
+        shortcode = post["shortcode"]
+        caption   = post["caption"].lower()
+        post_url  = f"https://www.instagram.com/p/{shortcode}/"
+        new_seen.add(shortcode)
 
         if KEYWORD in caption:
-            if post_id not in seen:
+            if shortcode not in seen:
                 print(f"[MATCH] Post nuevo con '{KEYWORD}': {post_url}")
-                send_notification(post_url, post.caption or "")
-                found_any = True
+                send_notification(post_url, post["caption"])
+                found = True
             else:
-                print(f"[SKIP]  Post ya notificado: {post_id}")
+                print(f"[SKIP]  Ya notificado: {shortcode}")
 
-        new_seen.add(post_id)
-
-    if not found_any:
-        print(f"[OK] {posts_checked} posts revisados. Sin novedades.")
+    if not found:
+        print(f"[OK] Sin novedades sobre '{KEYWORD}'.")
 
     save_seen(new_seen)
 
