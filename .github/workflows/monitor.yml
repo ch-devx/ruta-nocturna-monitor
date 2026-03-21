@@ -33,6 +33,13 @@ jobs:
           IG_PASS:    ${{ secrets.IG_PASS }}
         run: python monitor.py
 
+      - name: Subir screenshots de debug
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshots
+          path: "*.png"
+
       - name: Guardar seen_posts.json actualizado
         run: |
           git config user.name  "github-actions[bot]"
