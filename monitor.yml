@@ -21,12 +21,16 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install requests
+        run: |
+          pip install playwright requests
+          playwright install chromium
+          playwright install-deps chromium
 
       - name: Run monitor
         env:
-          NTFY_TOPIC:   ${{ secrets.NTFY_TOPIC }}
-          RSS_FEED_URL: ${{ secrets.RSS_FEED_URL }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          IG_USER:    ${{ secrets.IG_USER }}
+          IG_PASS:    ${{ secrets.IG_PASS }}
         run: python monitor.py
 
       - name: Guardar seen_posts.json actualizado
