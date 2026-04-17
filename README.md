@@ -1,4 +1,3 @@
-```markdown
 # Ruta Nocturna Monitor 🏃
 
 Monitorea automáticamente el Instagram de CC Las Américas (@cclasamericas) cada 2 horas.
@@ -11,15 +10,14 @@ No requiere la laptop encendida. Corre completamente en GitHub Actions de forma 
 
 ## Cómo funciona
 
-```
-Cada 2 horas GitHub levanta una VM gratuita
-  → Hace GET a la URL del feed RSS (rss.app) del perfil de @cclasamericas
-  → Parsea los posts del feed
-  → Si alguno contiene "ruta nocturna" (sin importar mayúsculas)
-      → Y no lo había notificado antes
-          → Manda push notification al teléfono con el link
-  → Guarda los IDs de posts vistos en seen_posts.json para no repetir notificaciones
-```
+Cada 2 horas GitHub levanta una VM gratuita y ejecuta este flujo:
+
+> Hace GET a la URL del feed RSS (rss.app) del perfil de @cclasamericas
+> → Parsea los posts del feed
+> → Si alguno contiene "ruta nocturna" (sin importar mayúsculas)
+> → Y no lo había notificado antes
+> → Manda push notification al teléfono con el link
+> → Guarda los IDs de posts vistos en `seen_posts.json` para no repetir notificaciones
 
 El feed RSS lo provee **rss.app**, que actúa como intermediario entre GitHub y Instagram.
 Esto evita el bloqueo 429 que Instagram aplica a las IPs de GitHub Actions cuando se
@@ -87,4 +85,3 @@ El feed del plan free de rss.app expira cada ~10–15 días. Cuando ocurre:
 Es un aviso de GitHub sobre versiones futuras, no afecta el funcionamiento.
 Habrá que actualizar `actions/checkout@v4` y `actions/setup-python@v5` cuando
 GitHub deprece Node.js 20 en los runners (previsto para mediados de 2026).
-```
