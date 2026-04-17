@@ -20,7 +20,7 @@ def notify(title, message, priority=3, tags=""):
             f"https://ntfy.sh/{NTFY_TOPIC}",
             data=message.encode("utf-8"),
             headers={
-                "Title": title,
+                "Title": title.encode("utf-8"),
                 "Priority": str(priority),
                 "Tags": tags,
             },
