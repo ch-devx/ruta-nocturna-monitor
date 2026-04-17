@@ -1,3 +1,4 @@
+```markdown
 # Ruta Nocturna Monitor 🏃
 
 Monitorea automáticamente el Instagram de CC Las Américas (@cclasamericas) cada 2 horas.
@@ -34,8 +35,8 @@ intenta hacer scraping directo.
 | `.github/workflows/monitor.yml` | Automatización con GitHub Actions (cada 2h) |
 | `seen_posts.json` | Se gestiona solo — guarda posts ya notificados para no repetir |
 
-> `requirements.txt` no es necesario — el script solo usa `requests`, que viene
-> preinstalado en el runner de GitHub.
+> `requirements.txt` no es necesario — el workflow instala `requests` directamente
+> con `pip install requests` en el step de dependencias.
 
 ---
 
@@ -77,7 +78,16 @@ el contenido con `[]`, luego correr el workflow de nuevo.
 Verificar que el secret `RSS_FEED_URL` esté bien escrito (mayúsculas, sin espacios).
 También puede ser que rss.app haya caído temporalmente — reintentará en 2 horas.
 
+**Llega notificación "feed caído, renueva RSS.app"**
+El feed del plan free de rss.app expira cada ~10–15 días. Cuando ocurre:
+1. Ir a rss.app con una cuenta nueva (cuenta de email desechable)
+2. Pegar `https://www.instagram.com/cclasamericas/` y generar el feed
+3. Copiar la nueva URL
+4. En el repo: Settings → Secrets → `RSS_FEED_URL` → Update
+5. El siguiente run automático (o uno manual) ya usará el nuevo feed
+
 **Warning de Node.js 20 en el log**
 Es un aviso de GitHub sobre versiones futuras, no afecta el funcionamiento.
-Se puede ignorar hasta junio 2026, cuando habrá que actualizar `actions/checkout`
-y `actions/setup-python` a versiones que soporten Node.js 24.
+Habrá que actualizar `actions/checkout@v4` y `actions/setup-python@v5` cuando
+GitHub deprece Node.js 20 en los runners (previsto para mediados de 2026).
+```

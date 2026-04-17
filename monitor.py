@@ -5,21 +5,27 @@ import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
-NTFY_TOPIC   = os.environ.get("NTFY_TOPIC", "")
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "")
 RSS_FEED_URL = os.environ.get("RSS_FEED_URL", "")
-KEYWORD      = "ruta nocturna"
-SEEN_FILE    = "seen_posts.json"
+KEYWORD = "ruta nocturna"
+SEEN_FILE = "seen_posts.json"
 
 
 def notify(title, message, priority=3, tags=""):
     if not NTFY_TOPIC:
         print("[WARN] NTFY_TOPIC no configurado.")
         return
-    payload = {"title": title, "message": message, "priority": priority}
-    if tags:
-        payload["tags"] = tags
     try:
-        requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", json=payload, timeout=10)
+        requests.post(
+            f"https://ntfy.sh/{NTFY_TOPIC}",
+            data=message.encode("utf-8"),
+            headers={
+                "Title": title,
+                "Priority": str(priority),
+                "Tags": tags,
+            },
+            timeout=10,
+        )
     except Exception as e:
         print(f"[ERROR] ntfy falló: {e}")
 
@@ -55,16 +61,18 @@ def fetch_feed():
         return None
     return [
         (
-            item.findtext("guid")  or "",
+            item.findtext("guid") or "",
             item.findtext("title") or "",
-            item.findtext("link")  or "",
+            item.findtext("link") or "",
         )
         for item in items
     ]
 
 
 def main():
-    print(f"[{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}] Revisando @cclasamericas...")
+    print(
+        f"[{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}] Revisando @cclasamericas..."
+    )
 
     posts = fetch_feed()
 
@@ -78,9 +86,9 @@ def main():
         print("[WARN] Feed no disponible. Notificación enviada. Saliendo con exit 0.")
         sys.exit(0)
 
-    seen     = load_seen()
+    seen = load_seen()
     new_seen = set(seen)
-    found    = False
+    found = False
 
     for guid, title, link in posts:
         new_seen.add(guid)
