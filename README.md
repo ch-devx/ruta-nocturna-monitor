@@ -35,9 +35,6 @@ intenta hacer scraping directo.
 | `.github/workflows/monitor.yml` | Automatización con GitHub Actions (cada 2h) |
 | `seen_posts.json` | Se gestiona solo — guarda posts ya notificados para no repetir |
 
-> `requirements.txt` no es necesario — el workflow instala `requests` directamente
-> con `pip install requests` en el step de dependencias.
-
 ---
 
 ## Secrets configurados en el repo
