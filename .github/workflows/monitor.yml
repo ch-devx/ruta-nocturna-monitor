@@ -1,16 +1,13 @@
 name: Ruta Nocturna Monitor
-
 on:
   schedule:
     - cron: "0 */2 * * *"
   workflow_dispatch:
-
 jobs:
   check:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -21,24 +18,13 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: |
-          pip install playwright requests
-          playwright install chromium
-          playwright install-deps chromium
+        run: pip install requests
 
       - name: Run monitor
         env:
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          IG_USER:    ${{ secrets.IG_USER }}
-          IG_PASS:    ${{ secrets.IG_PASS }}
+          NTFY_TOPIC:   ${{ secrets.NTFY_TOPIC }}
+          RSS_FEED_URL: ${{ secrets.RSS_FEED_URL }}
         run: python monitor.py
-
-      - name: Subir screenshots de debug
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-screenshots
-          path: "*.png"
 
       - name: Guardar seen_posts.json actualizado
         run: |
